@@ -1,0 +1,64 @@
+---
+# =============================================================================
+# playbook.yml
+#
+# This playbook declares the DESIRED STATE of this machine.
+# Ansible will work out what needs to change to reach that state.
+#
+# Key idea – DECLARATIVE vs IMPERATIVE:
+#   Imperative:  "run apt-get install, then mkdir, then write this file..."
+#   Declarative: "I want these packages installed, this directory to exist,
+#                 and this file to contain these values." (← this file)
+#
+# Run it with:
+#   ansible-playbook -i inventory.ini playbook.yml
+# =============================================================================
+
+- name: Configure the local development environment
+  hosts: local
+  become: true
+
+  vars:
+    app_name: my-app
+    app_version: "1.0.0"
+    app_env: development
+    app_port: 5000
+
+  tasks:
+
+    # ── Packages ──────────────────────────────────────────────────────────────
+
+    - name: Ensure required packages are installed
+      apt:
+        name:
+          - python3-flask
+          - curl
+        state: present       # "present" = install if missing, do nothing if already there
+        update_cache: true
+
+    # ── Directory ─────────────────────────────────────────────────────────────
+
+    - name: Ensure the app directory exists
+      file:
+        path: /opt/{{ app_name }}
+        state: directory     # "directory" = create if missing, do nothing if already there
+        mode: "0755"
+
+    # ── Config file (from template) ───────────────────────────────────────────
+
+    - name: Write the application config file
+      template:
+        src: app.conf.j2
+        dest: /opt/{{ app_name }}/app.conf
+        mode: "0644"
+
+    # ── Verify ────────────────────────────────────────────────────────────────
+
+    - name: Print the config file contents
+      command: cat /opt/{{ app_name }}/app.conf
+      register: config_output
+      changed_when: false    # Reading a file never counts as a "change"
+
+    - name: Show the result
+      debug:
+        msg: "{{ config_output.stdout_lines }}"
